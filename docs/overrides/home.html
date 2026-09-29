@@ -1,0 +1,74 @@
+{% extends "main.html" %}
+
+{% block tabs %}
+{% block footer %}{% endblock %}
+{{ super() }}
+
+<style>
+  .md-header {
+    position: initial
+  }
+
+  .md-main {
+    display: none
+  }
+</style>
+
+<section class="mdx-hero" style="flex-grow: 1;">
+  <div class="mdx-hero__inner">
+    <div class="mdx-hero__content">
+      <img src="{{ 'assets/logo.png' | url }}" alt="{{ config.site_name }} logo" class="mdx-hero__logo">
+      <h1 class="mdx-hero__title">{{ config.site_name }}</h1>
+      <p class="mdx-hero__subtitle">A Ballsdex package framework for providing extra capabilities to packages.</p>
+
+      <div class="mdx-hero__actions">
+        <a href="getting-started/introduction" class="md-button md-button--primary mdx-hero__button">Get Started</a>
+      </div>
+    </div>
+
+    <div class="mdx-install">
+      <div class="mdx-install__header">
+        <span class="mdx-install__label">Installation</span>
+        <button class="mdx-install__copy" type="button" data-copy-target="mdx-install-snippet"
+          aria-label="Copy to clipboard">
+          <span class="mdx-install__copy-icon"></span>
+          <span class="mdx-install__copy-text">Copy</span>
+        </button>
+      </div>
+      <pre class="mdx-install__code"><code id="mdx-install-snippet"><span class="mdx-hl-special">[[ballsdex.packages]]</span>
+<span class="mdx-hl-name">location</span> = <span class="mdx-hl-string">"git+https://github.com/Caylies/Plugin.git@0.1.0b1"</span>
+<span class="mdx-hl-name">path</span> = <span class="mdx-hl-string">"plugin"</span>
+<span class="mdx-hl-name">enabled</span> = <span class="mdx-hl-constant">true</span></code></pre>
+    </div>
+  </div>
+</section>
+
+<script>
+  (function () {
+    const button = document.querySelector(".mdx-install__copy");
+
+    if (!button)
+      return;
+
+    button.addEventListener("click", function () {
+      const target = document.getElementById(button.getAttribute("data-copy-target"));
+
+      if (!target)
+        return;
+
+      navigator.clipboard.writeText(target.textContent.trim()).then(function () {
+        const label = button.querySelector(".mdx-install__copy-text");
+        const original = label.textContent;
+
+        label.textContent = "Copied!";
+        button.classList.add("mdx-install__copy--done");
+
+        setTimeout(function () {
+          label.textContent = original;
+          button.classList.remove("mdx-install__copy--done");
+        }, 1600);
+      });
+    });
+  })();
+</script>
+{% endblock %}

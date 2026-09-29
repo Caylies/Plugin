@@ -1,0 +1,93 @@
+site_name: Plugin
+site_author: Cayla
+repo_url: https://github.com/Caylies/Plugin
+repo_name: Caylies/Plugin
+copyright: 'Copyright &copy; 2026 Cayla'
+
+theme:
+  name: material
+  custom_dir: docs/overrides
+
+  logo: assets/logo.png
+  favicon: assets/logo.png
+
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: plugin
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+
+    - media: "(prefers-color-scheme: dark)"
+      scheme: plugin-dark
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+  icon:
+    repo: fontawesome/brands/github
+
+  features:
+    - content.code.copy
+    - content.code.annotate
+    - content.code.select
+    - navigation.footer
+    - toc.follow
+
+nav:
+  - Getting Started:
+    - Introduction: getting-started/introduction.md
+    - Plugins: getting-started/plugins.md
+    - Commands: getting-started/commands.md
+  - API Reference:
+      - api/plugins.md
+      - api/hooking.md
+      - Components:
+        - api/ballspawnview.md
+  - Changelog: changelog.md
+
+markdown_extensions:
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - markdown_grid_tables
+  - attr_list
+  - md_in_html
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+
+plugins:
+  - search
+  - mkdocstrings:
+      enable_inventory: true
+      default_handler: python
+      handlers:
+        python:
+          paths:
+            - .
+          inventories:
+            - https://discordpy.readthedocs.io/en/latest/objects.inv
+            - https://docs.python.org/3/objects.inv
+            - https://docs.djangoproject.com/en/dev/objects.inv
+          options:
+            docstring_style: numpy
+            docstring_section_style: table
+            show_root_heading: true
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            show_signature_annotations: true
+            separate_signature: true
+            signature_crossrefs: true
+            merge_init_into_class: true
+            show_bases: true
+            show_source: false
+            members_order: source
+            heading_level: 2
+
+extra_css:
+  - stylesheets/extra.css
+
+watch:
+  - .
