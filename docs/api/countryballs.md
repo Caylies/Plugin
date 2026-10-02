@@ -1,4 +1,4 @@
-# BallSpawnViewOverride
+# Countryballs
 
 ::: plugin.modules.components.countryballs.views
     options:

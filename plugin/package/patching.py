@@ -12,4 +12,5 @@ def patch_spawn_view(bot: "BallsDexBot", view: type[countryball.BallSpawnView]):
     cog = cast("CountryBallsSpawner", bot.get_cog("CountryBallsSpawner"))
 
     cog.countryball_cls = view
-    countryballs_cog.BallSpawnView = view
+
+    setattr(countryballs_cog, "BallSpawnView", view)

@@ -1,4 +1,4 @@
-# pyright: reportIncompatibleMethodOverride=false
+# pyright: reportIncompatibleMethodOverride=false, reportIncompatibleVariableOverride=false
 
 from __future__ import annotations
 
@@ -10,13 +10,14 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 import discord
-from discord.ui import Button, Item, MediaGallery, TextDisplay
+from discord.ui import Button, Item, MediaGallery, TextDisplay, button
 from django.utils import timezone
 
 from ballsdex.core.discord import Container, LayoutView
 from ballsdex.core.metrics import caught_balls
 from ballsdex.core.utils.formatting import format_command_mentions
-from ballsdex.packages.countryballs.countryball import BallSpawnView
+from ballsdex.core.utils.utils import can_mention
+from ballsdex.packages.countryballs.countryball import BallSpawnView, CatchRow, CountryballNamePrompt
 from bd_models.models import Ball, BallInstance, GuildConfig, Player, Special, Trade, TradeObject, balls, specials
 from settings.models import PromptMessage, Settings, settings
 
@@ -32,6 +33,237 @@ _QUOTE_TABLE = str.maketrans({"\u2019": "'", "\u2018": "'", "\u201c": '"', "\u20
 
 def _random_name() -> str:
     return "".join(random.choices(string.ascii_letters, k=15))
+
+
+class CountryballNamePromptOverride(CountryballNamePrompt):
+    """
+    `CountryballNamePrompt` is the modal shown when a user presses the catch button. It validates
+    the submitted name and finalizes the catch. `CountryballNamePromptOverride` extends off of
+    `CountryballNamePrompt` and provides hookable methods for plugins.
+    """
+
+    @hookable
+    async def on_error(self, interaction: discord.Interaction["BallsDexBot"], error: Exception) -> None:
+        if isinstance(error, discord.NotFound) and error.code == 10062:
+            return
+
+        log.exception("An error occurred in countryball catching prompt", exc_info=error)
+
+        message = f"An error occurred with this {settings.collectible_name}."
+
+        if interaction.response.is_done():
+            await interaction.followup.send(message)
+        else:
+            await interaction.response.send_message(message)
+
+    @hookable
+    async def resolve_player(self, interaction: discord.Interaction["BallsDexBot"]) -> Player:
+        """
+        Gets or creates the `Player` submitting this prompt.
+
+        Parameters
+        ----------
+        interaction: discord.Interaction["BallsDexBot"]
+            The interaction tied to the submitted modal.
+
+        Returns
+        -------
+        Player
+            The player submitting this prompt.
+        """
+        player, _ = await Player.objects.aget_or_create(discord_id=interaction.user.id)
+
+        return player
+
+    @hookable
+    def get_slow_message(self, interaction: discord.Interaction["BallsDexBot"]) -> str:
+        """
+        Builds the message shown when the countryball was already caught by the time of submission.
+
+        Parameters
+        ----------
+        interaction: discord.Interaction["BallsDexBot"]
+            The interaction tied to the submitted modal.
+
+        Returns
+        -------
+        str
+            The message to display.
+        """
+        return settings.get_formatted_message(
+            category=PromptMessage.PromptType.SLOW,
+            mention=interaction.user.mention,
+            model=self.view.model,
+            bot=interaction.client,
+        )
+
+    @hookable
+    async def send_slow_message(self, interaction: discord.Interaction["BallsDexBot"], player: Player) -> None:
+        message = self.get_slow_message(interaction)
+
+        await interaction.followup.send(message, ephemeral=True, allowed_mentions=await can_mention([player]))
+
+    @hookable
+    def truncate_wrong_name(self, text: str) -> str:
+        """
+        Shortens an overly long wrong name so it's safe to display back to the user.
+
+        Parameters
+        ----------
+        text: str
+            The submitted name.
+
+        Returns
+        -------
+        str
+            The name, truncated to 500 characters with an ellipsis if it was longer.
+        """
+        if len(text) > 500:
+            return text[:500] + "..."
+
+        return text
+
+    @hookable
+    def get_wrong_message(self, interaction: discord.Interaction["BallsDexBot"], wrong_name: str) -> str:
+        """
+        Builds the message shown when the submitted name does not match.
+
+        Parameters
+        ----------
+        interaction: discord.Interaction["BallsDexBot"]
+            The interaction tied to the submitted modal.
+        wrong_name: str
+            The (possibly truncated) name that was submitted.
+
+        Returns
+        -------
+        str
+            The message to display.
+        """
+        return settings.get_formatted_message(
+            category=PromptMessage.PromptType.WRONG,
+            mention=interaction.user.mention,
+            model=self.view.model,
+            bot=interaction.client,
+            wrong=wrong_name,
+        )
+
+    @hookable
+    async def send_wrong_message(
+        self, interaction: discord.Interaction["BallsDexBot"], player: Player, wrong_name: str
+    ) -> None:
+        message = self.get_wrong_message(interaction, wrong_name)
+
+        await interaction.followup.send(message, allowed_mentions=await can_mention([player]), ephemeral=False)
+
+    @hookable
+    async def send_catch_result(
+        self, interaction: discord.Interaction["BallsDexBot"], player: Player, ball, is_new: bool
+    ) -> None:
+        await interaction.followup.send(
+            self.view.get_catch_message(ball, is_new, interaction.user.mention),
+            allowed_mentions=discord.AllowedMentions(users=player.can_be_mentioned),
+        )
+        await interaction.followup.edit_message(self.view.message.id, view=self.view)
+
+    @hookable
+    async def on_submit(self, interaction: discord.Interaction["BallsDexBot"]) -> None:
+        await interaction.response.defer(thinking=True)
+
+        player = await self.resolve_player(interaction)
+
+        if self.view.caught:
+            await self.send_slow_message(interaction, player)
+            return
+
+        if not self.view.is_name_valid(self.name.value):
+            wrong_name = self.truncate_wrong_name(self.name.value)
+            await self.send_wrong_message(interaction, player, wrong_name)
+            return
+
+        ball, is_new = await self.view.catch_ball(interaction.user, player=player, guild=interaction.guild)
+
+        await self.send_catch_result(interaction, player, ball, is_new)
+
+
+class CatchRowOverride(CatchRow):
+    """
+    `CatchRow` is the action row holding the catch button. `CatchRowOverride` extends off of
+    `CatchRow` and provides hookable methods for plugins.
+    """
+
+    def __init__(self, spawn_view: "BallSpawnView") -> None:
+        super().__init__(spawn_view)
+
+        self.catch_button.style = self.get_button_style()
+        self.catch_button.label = self.get_button_label()
+
+    @hookable
+    def get_button_style(self) -> discord.ButtonStyle:
+        """
+        The catch button's color.
+
+        Returns
+        -------
+        discord.ButtonStyle
+            The style to apply to the catch button.
+        """
+        return discord.ButtonStyle.primary
+
+    @hookable
+    def get_button_label(self) -> str:
+        """
+        The catch button's label.
+
+        Returns
+        -------
+        str
+            The text shown on the catch button.
+        """
+        return settings.catch_button_label
+
+    @hookable
+    def get_slow_message(self, interaction: discord.Interaction["BallsDexBot"]) -> str:
+        """
+        Builds the message shown when the catch button is pressed after the countryball was
+        already caught.
+
+        Parameters
+        ----------
+        interaction: discord.Interaction["BallsDexBot"]
+            The interaction tied to the button press.
+
+        Returns
+        -------
+        str
+            The message to display.
+        """
+        return settings.get_formatted_message(
+            category=PromptMessage.PromptType.SLOW,
+            mention=interaction.user.mention,
+            model=self.spawn_view.model,
+            bot=interaction.client,
+        )
+
+    @hookable
+    def create_name_prompt(self) -> CountryballNamePrompt:
+        """
+        Creates the modal shown when the catch button is pressed.
+
+        Returns
+        -------
+        CountryballNamePrompt
+            The modal to display.
+        """
+        return CountryballNamePromptOverride(self.spawn_view)
+
+    @button(label="Catch me!")
+    @hookable
+    async def catch_button(self, interaction: discord.Interaction["BallsDexBot"], button: Button):
+        if self.spawn_view.caught:
+            await interaction.response.send_message(self.get_slow_message(interaction), ephemeral=True)
+        else:
+            await interaction.response.send_modal(self.create_name_prompt())
 
 
 class BallSpawnViewOverride(BallSpawnView):
@@ -66,9 +298,13 @@ class BallSpawnViewOverride(BallSpawnView):
         Force a specific health bonus if set, otherwise random range defined in settings.
     """
 
+    catch_row: CatchRowOverride
+
     @hookable
     def __init__(self, bot: "BallsDexBot", model: Ball):
         super().__init__(bot, model)
+
+        self.catch_row = CatchRowOverride(self)
 
     @property
     @hookable
@@ -160,12 +396,12 @@ class BallSpawnViewOverride(BallSpawnView):
     @classmethod
     @hookable
     async def get_random(cls, bot: "BallsDexBot") -> BallSpawnViewOverride:
-        countryballs = cls.get_spawnable_balls()
+        countryballs = cls.get_spawnable_balls()  # pyright: ignore[reportCallIssue]
 
         if not countryballs:
             raise RuntimeError("No ball to spawn")
 
-        return cls(bot, cls.pick_ball(countryballs))
+        return cls(bot, cls.pick_ball(countryballs))  # pyright: ignore[reportCallIssue]
 
     @classmethod
     @hookable
@@ -225,7 +461,7 @@ class BallSpawnViewOverride(BallSpawnView):
     @classmethod
     @hookable
     def get_random_special(cls) -> Special | None:
-        population = cls.get_special_candidates()
+        population = cls.get_special_candidates()  # pyright: ignore[reportCallIssue]
 
         if not population:
             return None
@@ -340,6 +576,9 @@ class BallSpawnViewOverride(BallSpawnView):
         str
             The randomly generated file name.
         """
+        if not self.model.wild_card.name:
+            return ""
+
         extension = self.model.wild_card.name.split(".")[-1]
 
         return f"nt_{_random_name()}.{extension}"
@@ -365,20 +604,54 @@ class BallSpawnViewOverride(BallSpawnView):
 
     @hookable
     def get_spawn_message(self) -> str:
-        spawn_message = settings.get_formatted_message(
+        """
+        Builds the message shown above the countryball when it spawns.
+
+        Returns
+        -------
+        str
+            The message to display.
+        """
+        return settings.get_formatted_message(
             category=PromptMessage.PromptType.SPAWN, mention="", model=self.model, bot=self.bot
         )
 
-        assert spawn_message
-
-        return spawn_message
-
     @hookable
     async def send_spawn(self, channel: discord.TextChannel, file_name: str) -> discord.Message:
+        """
+        Sends the spawn message to the channel.
+
+        Parameters
+        ----------
+        channel: discord.TextChannel
+            The channel to send the spawn message to.
+        file_name: str
+            The name of the attached countryball image.
+
+        Returns
+        -------
+        discord.Message
+            The sent spawn message.
+        """
         return await channel.send(view=self, file=discord.File(self.model.wild_card.path, filename=file_name))
 
     @hookable
     async def spawn(self, channel: discord.TextChannel) -> bool:
+        """
+        Spawn a countryball in a channel.
+
+        Parameters
+        ----------
+        channel: discord.TextChannel
+            The channel where to spawn the countryball. Must have permission to send messages
+            and upload files as a bot (not through interactions).
+
+        Returns
+        -------
+        bool
+            `True` if the operation succeeded, otherwise `False`. An error will be displayed
+            in the logs if that's the case.
+        """
         file_name = self.generate_file_name()
 
         try:
@@ -460,6 +733,21 @@ class BallSpawnViewOverride(BallSpawnView):
 
     @hookable
     async def resolve_player(self, user: discord.User | discord.Member, player: Player | None) -> Player:
+        """
+        Gets or creates the `Player` catching the countryball.
+
+        Parameters
+        ----------
+        user: discord.User | discord.Member
+            The user catching the countryball.
+        player: Player | None
+            If already fetched, pass the player here to avoid an additional query.
+
+        Returns
+        -------
+        Player
+            The player catching the countryball.
+        """
         return player or (await Player.objects.aget_or_create(discord_id=user.id))[0]
 
     @hookable
@@ -542,6 +830,19 @@ class BallSpawnViewOverride(BallSpawnView):
 
     @hookable
     async def return_to_owner(self, instance: BallInstance) -> BallInstance:
+        """
+        Returns a dropped countryball to its original owner, without creating a trade.
+
+        Parameters
+        ----------
+        instance: BallInstance
+            The existing countryball instance being caught back by its owner.
+
+        Returns
+        -------
+        BallInstance
+            The same instance, unlocked.
+        """
         instance.locked = None
 
         await instance.asave(update_fields=("locked",))
@@ -550,6 +851,21 @@ class BallSpawnViewOverride(BallSpawnView):
 
     @hookable
     async def transfer_existing(self, instance: BallInstance, player: Player) -> BallInstance:
+        """
+        Transfers a dropped countryball to a new owner, registering it as a trade.
+
+        Parameters
+        ----------
+        instance: BallInstance
+            The existing countryball instance being caught by a new owner.
+        player: Player
+            The player receiving the countryball.
+
+        Returns
+        -------
+        BallInstance
+            The same instance, now owned by `player` and unlocked.
+        """
         trade = await Trade.objects.acreate(player1=instance.player, player2=player)
 
         await TradeObject.objects.acreate(trade=trade, player=instance.player, ballinstance=instance)
@@ -564,9 +880,31 @@ class BallSpawnViewOverride(BallSpawnView):
 
     @hookable
     async def hand_over_existing(self, player: Player) -> BallInstance:
+        """
+        Hands over the view's existing countryball instance, either back to its own owner or to a
+        new one, depending on who is catching it.
+
+        Parameters
+        ----------
+        player: Player
+            The player catching the countryball.
+
+        Raises
+        ------
+        RuntimeError
+            The view has no existing countryball instance set.
+
+        Returns
+        -------
+        BallInstance
+            The handed-over instance.
+        """
         instance = self.ballinstance
 
-        if instance and instance.player_id == player.pk:
+        if instance is None:
+            raise RuntimeError("'hand_over_existing()' called without an existing ball instance")
+
+        if instance.player_id == player.pk:
             return await self.return_to_owner(instance)
 
         return await self.transfer_existing(instance, player)
@@ -641,6 +979,16 @@ class BallSpawnViewOverride(BallSpawnView):
 
     @hookable
     def record_metrics(self, user: discord.User | discord.Member, ball: BallInstance):
+        """
+        Records a Prometheus metric for the catch.
+
+        Parameters
+        ----------
+        user: discord.User | discord.Member
+            The user who caught the countryball.
+        ball: BallInstance
+            The countryball that was caught.
+        """
         if not isinstance(user, discord.Member) or not user.guild.member_count:
             return
 
@@ -654,11 +1002,26 @@ class BallSpawnViewOverride(BallSpawnView):
 
     @hookable
     def get_catch_message(self, ball: BallInstance, new_ball: bool, mention: str) -> str:
+        """
+        Generate a user-facing message after a ball has been caught.
+
+        Parameters
+        ----------
+        ball: BallInstance
+            The newly created ball instance.
+        new_ball: bool
+            Whether this is a new countryball in completion (as returned by `catch_ball`).
+        mention: str
+            The mention string for the user who caught the countryball.
+
+        Returns
+        -------
+        str
+            The full catch message, including the stat line and any extra catch text.
+        """
         catch_message = settings.get_formatted_message(
             category=PromptMessage.PromptType.CATCH, mention=mention, model=self.model, bot=self.bot
         )
-
-        assert catch_message
 
         text = self.get_catch_text(ball, new_ball)
 

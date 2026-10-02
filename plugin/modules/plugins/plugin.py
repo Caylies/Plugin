@@ -6,7 +6,7 @@ from typing import Protocol
 
 from ..hooking import hooks
 
-__all__ = ("Plugin",)
+__all__ = ("Plugin", "get")
 
 log = logging.getLogger("plugin.modules.plugins.plugin")
 
@@ -17,7 +17,7 @@ class _HookTarget(Protocol):
     hook_key: str
 
 
-class PluginConflict(Exception):
+class _PluginConflict(Exception):
     """
     Raised when a plugin is registered under an ID that's already in use.
 
@@ -45,12 +45,12 @@ class Plugin:
 
     def __init__(self, id: str):
         if id in _plugins:
-            raise PluginConflict(id)
+            raise _PluginConflict(id)
 
         self.id = id
         _plugins[id] = self
 
-        log.info(f"Registered new plugin: '{id}'")
+        log.info(f"Registered new plugin: {id}")
 
     def _remove(self, inputHooks: dict[str, list[tuple[str, Callable]]]):
         for key in list(inputHooks):
