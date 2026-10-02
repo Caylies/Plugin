@@ -43,7 +43,7 @@ nav:
       - api/plugins.md
       - api/hooking.md
       - Components:
-        - api/ballspawnview.md
+        - api/countryballs.md
   - Changelog: changelog.md
 
 markdown_extensions:

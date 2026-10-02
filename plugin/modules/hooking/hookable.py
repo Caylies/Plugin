@@ -1,17 +1,16 @@
+from __future__ import annotations
+
 import functools
 import inspect
 import logging
-from collections.abc import Awaitable, Callable
-from typing import Any, ParamSpec, TypeVar, overload
+from collections.abc import Callable, Coroutine
+from typing import Any, Concatenate, Protocol, cast, overload
 
 from .hooks import after, before
 
-__all__ = ("hookable", "Cancel", "Replace")
+__all__ = ("hookable", "Cancel", "Replace", "Hookable", "HookableCoroutine")
 
 log = logging.getLogger("plugin.modules.hooking.hookable")
-
-_P = ParamSpec("_P")
-_R = TypeVar("_R")
 
 
 class Replace:
@@ -43,6 +42,36 @@ class Cancel(Exception):
         self.value = value
 
 
+class Hookable[**P, R](Protocol):
+    """
+    The type `hookable` returns for a sync function: callable like the original, plus the
+    `hook_key` attribute.
+    """
+
+    hook_key: str
+
+    def __call__(self, inst: Any, *args: P.args, **kwargs: P.kwargs) -> R: ...
+    @overload
+    def __get__(self, obj: None, objtype: type | None = None) -> Hookable[P, R]: ...
+    @overload
+    def __get__(self, obj: object, objtype: type | None = None) -> Callable[P, R]: ...
+
+
+class HookableCoroutine[**P, R](Protocol):
+    """
+    The type `hookable` returns for an async function. Same as `Hookable`, but callable as a
+    coroutine function.
+    """
+
+    hook_key: str
+
+    def __call__(self, inst: Any, *args: P.args, **kwargs: P.kwargs) -> Coroutine[Any, Any, R]: ...
+    @overload
+    def __get__(self, obj: None, objtype: type | None = None) -> HookableCoroutine[P, R]: ...
+    @overload
+    def __get__(self, obj: object, objtype: type | None = None) -> Callable[P, Coroutine[Any, Any, R]]: ...
+
+
 def _reject_coroutine(out: Any, plugin_id: str, key: str) -> None:
     if not inspect.iscoroutine(out):
         return
@@ -52,21 +81,23 @@ def _reject_coroutine(out: Any, plugin_id: str, key: str) -> None:
 
 
 @overload
-def hookable(fn: Callable[_P, Awaitable[_R]]) -> Callable[_P, Awaitable[_R]]: ...
+def hookable[**P, R](fn: Callable[Concatenate[Any, P], Coroutine[Any, Any, R]]) -> HookableCoroutine[P, R]: ...
 @overload
-def hookable(fn: Callable[_P, _R]) -> Callable[_P, _R]: ...
-def hookable(fn: Callable[_P, _R] | Callable[_P, Awaitable[_R]]) -> Callable[_P, Any]:
+def hookable[**P, R](fn: Callable[Concatenate[Any, P], R]) -> Hookable[P, R]: ...
+def hookable[**P, R](
+    fn: Callable[Concatenate[Any, P], Coroutine[Any, Any, R]] | Callable[Concatenate[Any, P], R],
+) -> HookableCoroutine[P, R] | Hookable[P, R]:
     """
     Allows a function to be hooked onto.
 
     Parameters
     ----------
-    fn: Callable[_P, _R] | Callable[_P, Awaitable[_R]]
+    fn: Callable[Concatenate[Any, P], R] | Callable[Concatenate[Any, P], Coroutine[Any, Any, R]]
         The function to mark as hookable.
 
     Returns
     -------
-    Callable[_P, _R] | Callable[_P, Awaitable[_R]]
+    Hookable[P, R] | HookableCoroutine[P, R]
         A wrapper around `fn` that takes the same parameters and returns the
         same type, and runs registered `before` and `after` hooks around every call.
     """
@@ -75,7 +106,7 @@ def hookable(fn: Callable[_P, _R] | Callable[_P, Awaitable[_R]]) -> Callable[_P,
     if inspect.iscoroutinefunction(fn):
 
         @functools.wraps(fn)
-        async def wrapper(*args, **kwargs):  # pyright: ignore[reportRedeclaration]
+        async def async_wrapper(*args, **kwargs):
             for plugin_id, hook in list(before[key]):
                 try:
                     out = hook(*args, **kwargs)
@@ -104,10 +135,14 @@ def hookable(fn: Callable[_P, _R] | Callable[_P, Awaitable[_R]]) -> Callable[_P,
 
             return result
 
+        setattr(async_wrapper, "hook_key", key)
+
+        return cast(HookableCoroutine[P, R], async_wrapper)
+
     else:
 
         @functools.wraps(fn)
-        def wrapper(*args, **kwargs):
+        def sync_wrapper(*args, **kwargs):
             for plugin_id, hook in list(before[key]):
                 try:
                     _reject_coroutine(hook(*args, **kwargs), plugin_id, key)
@@ -132,6 +167,6 @@ def hookable(fn: Callable[_P, _R] | Callable[_P, Awaitable[_R]]) -> Callable[_P,
 
             return result
 
-    setattr(wrapper, "hook_key", key)
+        setattr(sync_wrapper, "hook_key", key)
 
-    return wrapper
+        return cast(Hookable[P, R], sync_wrapper)

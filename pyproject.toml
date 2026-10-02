@@ -1,7 +1,7 @@
 [project]
 name = "plugin"
 keywords = ["framework"]
-version = "0.1.0b1"
+version = "0.1.0b2"
 description = "A Ballsdex package framework for providing extra capabilities to other packages."
 license = "MIT"
 license-files = ["LICENSE"]
@@ -13,7 +13,8 @@ readme = "README.md"
 
 [dependency-groups]
 dev = [
-    "ruff>=0.16.9",
+    "bd-stubs[all]",
+    "ruff>=0.16.10",
 ]
 
 docs = [
@@ -21,6 +22,9 @@ docs = [
     "mkdocs-material>=9.7.7",
     "mkdocstrings[python]>=1.0.6",
 ]
+
+[tool.pyright]
+reportMissingModuleSource = "none"
 
 [tool.ruff]
 line-length = 120
@@ -40,6 +44,9 @@ ignore = ["E203"]
 [tool.ruff.lint.isort]
 known-first-party = ["ballsdex", "bd_models", "settings"]
 split-on-trailing-comma = false
+
+[tool.uv.sources]
+bd-stubs = { git = "https://github.com/Caylies/bd-stubs", rev = "0.1.2" }
 
 [project.urls]
 Homepage = "https://caylies.github.io/Plugin/"
