@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
-from typing import Protocol
+from typing import Any, Protocol
 
 from ..hooking import hooks
 
@@ -85,12 +85,16 @@ class Plugin:
 
     def unload(self):
         """
-        Unloads a plugin by removing every hook the plugin registered.
+        Unloads the plugin by unregistering it and cleaning up its hooks.
         """
         self._remove(hooks.before)
         self._remove(hooks.after)
 
-    def before(self, target: _HookTarget):
+        del _plugins[self.id]
+
+        log.info(f"Unregistered plugin: {self.id}")
+
+    def before[F: Callable[..., Any]](self, target: _HookTarget) -> Callable[[F], F]:
         """
         Runs a function before the target method runs. Raise `Cancel(value)` to skip the method and return `value`.
 
@@ -98,16 +102,21 @@ class Plugin:
         ----------
         target: _HookTarget
             The method to run the function before.
+
+        Returns
+        -------
+        Callable[[F], F]
+            A decorator that registers the function as a before-hook for the target and returns it.
         """
 
-        def decorator(fn: Callable):
+        def decorator(fn: F) -> F:
             hooks.before[target.hook_key].append((self.id, fn))
 
             return fn
 
         return decorator
 
-    def after(self, target: _HookTarget):
+    def after[F: Callable[..., Any]](self, target: _HookTarget) -> Callable[[F], F]:
         """
         Runs a function after the target method runs. Return `Replace(value)` to change the result.
 
@@ -115,9 +124,14 @@ class Plugin:
         ----------
         target: _HookTarget
             The method to run the function after.
+
+        Returns
+        -------
+        Callable[[F], F]
+            A decorator that registers the function as an after-hook for the target and returns it.
         """
 
-        def decorator(fn: Callable):
+        def decorator(fn: F) -> F:
             hooks.after[target.hook_key].append((self.id, fn))
 
             return fn
