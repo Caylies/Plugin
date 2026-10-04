@@ -9,4 +9,21 @@
 
 **Plugin** is a Ballsdex package framework for providing extra capabilities to packages.
 
+<details>
+<summary><b>Installation</b></summary>
+
+<div align="left">
+
+```toml
+[[ballsdex.packages]]
+location = "git+https://github.com/Caylies/Plugin.git@0.1.0b3"
+path = "plugin"
+enabled = true
+```
+
+</div>
+
+</details>
+
 [Plugin documentation website](https://caylies.github.io/Plugin/)
+</div>

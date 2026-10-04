@@ -1,7 +1,7 @@
 [project]
 name = "plugin"
 keywords = ["framework"]
-version = "0.1.0b2"
+version = "0.1.0b3"
 description = "A Ballsdex package framework for providing extra capabilities to other packages."
 license = "MIT"
 license-files = ["LICENSE"]

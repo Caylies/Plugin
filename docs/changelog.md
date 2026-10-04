@@ -10,6 +10,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.1.0b3] <small>- 2026-10-04</small>
+
+### Added
+
+- `Plugin.unload` now logs when a plugin is unregistered.
+- Added Plugin's package installation entry to the project's README file for those who can't visit the website.
+
+### Changed
+
+- Improved docstring for `Plugin.unload`.
+- Improved type checking and docstring for `Plugin.before` and `Plugin.after` hooks.
+
+### Fixed
+
+- Fixed plugin unloading only removing plugin hooks and not unregistering the plugin.
+
+---
+
 ## [0.1.0b2] <small>- 2026-10-01</small>
 
 ### Added
@@ -50,6 +68,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Initial Plugin beta release.
 
 
-[Unreleased]: https://github.com/Caylies/Plugin/compare/0.1.0b2...HEAD
+[Unreleased]: https://github.com/Caylies/Plugin/compare/0.1.0b3...HEAD
+[0.1.0b3]: https://github.com/Caylies/Plugin/releases/tag/0.1.0b3
 [0.1.0b2]: https://github.com/Caylies/Plugin/releases/tag/0.1.0b2
 [0.1.0b1]: https://github.com/Caylies/Plugin/releases/tag/0.1.0b1

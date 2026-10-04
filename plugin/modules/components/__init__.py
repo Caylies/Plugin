@@ -3,6 +3,8 @@ from typing import TYPE_CHECKING, Literal, overload
 if TYPE_CHECKING:
     from .countryballs.views import BallSpawnViewOverride, CatchRowOverride, CountryballNamePromptOverride
 
+__all__ = ("get_component",)
+
 
 @overload
 def get_component(component: Literal["BallSpawnView"]) -> type["BallSpawnViewOverride"]: ...
