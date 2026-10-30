@@ -261,7 +261,14 @@ class CatchRowOverride(CatchRow):
     @hookable
     async def catch_button(self, interaction: discord.Interaction["BallsDexBot"], button: Button):
         if self.spawn_view.caught:
-            await interaction.response.send_message(self.get_slow_message(interaction), ephemeral=True)
+            message = self.get_slow_message(interaction)
+
+            if interaction.response.is_done():
+                await interaction.followup.send(message, ephemeral=True)
+            else:
+                await interaction.response.send_message(message, ephemeral=True)
+        elif interaction.response.is_done():
+            await interaction.followup.send("This interaction was already handled, please try again.", ephemeral=True)
         else:
             await interaction.response.send_modal(self.create_name_prompt())
 
