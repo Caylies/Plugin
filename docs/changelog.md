@@ -10,6 +10,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.1.0b4] <small>- 2026-10-30</small>
+
+### Fixed
+
+- Fixed `CountryballNamePromptOverride` breaking for finished interactions.
+
+---
+
 ## [0.1.0b3] <small>- 2026-10-04</small>
 
 ### Added
@@ -68,7 +76,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Initial Plugin beta release.
 
 
-[Unreleased]: https://github.com/Caylies/Plugin/compare/0.1.0b3...HEAD
+[Unreleased]: https://github.com/Caylies/Plugin/compare/0.1.0b4...HEAD
+[0.1.0b4]: https://github.com/Caylies/Plugin/releases/tag/0.1.0b4
 [0.1.0b3]: https://github.com/Caylies/Plugin/releases/tag/0.1.0b3
 [0.1.0b2]: https://github.com/Caylies/Plugin/releases/tag/0.1.0b2
 [0.1.0b1]: https://github.com/Caylies/Plugin/releases/tag/0.1.0b1

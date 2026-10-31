@@ -1,7 +1,7 @@
 [project]
 name = "plugin"
 keywords = ["framework"]
-version = "0.1.0b3"
+version = "0.1.0b4"
 description = "A Ballsdex package framework for providing extra capabilities to other packages."
 license = "MIT"
 license-files = ["LICENSE"]
@@ -14,7 +14,7 @@ readme = "README.md"
 [dependency-groups]
 dev = [
     "bd-stubs[all]",
-    "ruff>=0.16.10",
+    "ruff>=0.17.3",
 ]
 
 docs = [

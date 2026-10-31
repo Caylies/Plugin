@@ -16,7 +16,7 @@
 
 ```toml
 [[ballsdex.packages]]
-location = "git+https://github.com/Caylies/Plugin.git@0.1.0b3"
+location = "git+https://github.com/Caylies/Plugin.git@0.1.0b4"
 path = "plugin"
 enabled = true
 ```
