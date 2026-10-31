@@ -10,6 +10,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.1.0b4] <small>- 2026-10-30</small>
+
+### Fixed
+
+- Fixed `CountryballNamePromptOverride` breaking for finished interactions.
+
+---
+
 ## [0.1.0b3] <small>- 2026-10-04</small>
 
 ### Added
